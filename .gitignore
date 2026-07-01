@@ -1,0 +1,6 @@
+﻿venv/
+__pycache__/
+*.pyc
+.streamlit/
+retail_store.db
+retail_store.db
