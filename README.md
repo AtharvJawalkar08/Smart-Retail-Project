@@ -93,3 +93,34 @@ forecasting approach - per-entity models, seasonality features, baseline
 comparison - is the same pattern used in production demand forecasting;
 swapping in real transaction data would require no changes to the
 training or serving code, only to insert_mock_data.py.
+## Architecture
+
+```mermaid
+flowchart LR
+    Setup[setup_database.py] --> DB[(retail_store.db<br/>SQLite)]
+    MockData[insert_mock_data.py<br/>120 days synthetic sales] --> DB
+    DB --> Train[train_ai_model.py<br/>per-SKU LinearRegression]
+    Train --> Models[(demand_models.joblib)]
+    Models --> App[app.py · Streamlit]
+    DB --> App
+    App --> Restock[Restock recommendation logic]
+    DB --> RTrends[analyze_trends.R]
+    RTrends --> Plots[Rplots.pdf]
+```
+
+## Key metrics
+
+| Product | Model MAE | Naive Baseline MAE | Result |
+|---|---|---|---|
+| Organic Milk | 1.23 units/day | 2.08 units/day | Beats baseline |
+| Whole Wheat Bread | 1.19 units/day | 1.58 units/day | Beats baseline |
+| Fresh Bananas | 4.46 units/day | 6.21 units/day | Beats baseline |
+
+Evaluated on a chronological 80/20 train/test split per SKU, against a "predict tomorrow = same as today" naive baseline — not just reported in isolation.
+
+## What I'd improve with more time
+
+- **Use real transaction data.** The seasonality and trend patterns are synthetic-by-design to validate the modeling approach — the honest next step is swapping in real POS data, which (per the README's own note) requires no changes to training/serving code, only to the data-generation step.
+- **Try a model that captures more than linear trend + day-of-week.** A per-SKU linear regression is simple and interpretable, but something like gradient boosting or a lightweight time-series model (e.g., Prophet or a seasonal ARIMA) would likely close the gap further on high-variance items like bananas, where the baseline is closest.
+- **Add prediction intervals, not just point forecasts.** Restocking decisions are risk decisions — showing a confidence range (not just a single number) would make the reorder-quantity logic more honest about forecast uncertainty.
+- **Retrain on a schedule instead of manually.** Right now models are trained once and loaded; a production version would need scheduled retraining as new sales data accumulates, plus drift monitoring to catch when a SKU's demand pattern shifts.
