@@ -64,8 +64,9 @@ app rather than retrained on every interaction.
 | Secondary analysis | R, RSQLite |
 
 ## Project structure
+
+```
 Smart_Retail_Project/
-|
 ├── app.py                  # Streamlit dashboard (run this to launch)
 ├── setup_database.py       # Creates the SQLite database and tables
 ├── insert_mock_data.py     # Generates 120 days of seasonal sales data
@@ -75,6 +76,8 @@ Smart_Retail_Project/
 │   └── demand_models.joblib
 ├── retail_store.db
 └── requirements.txt
+```
+
 ## Getting started
 
 ```bash
@@ -93,3 +96,29 @@ forecasting approach - per-entity models, seasonality features, baseline
 comparison - is the same pattern used in production demand forecasting;
 swapping in real transaction data would require no changes to the
 training or serving code, only to insert_mock_data.py.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Setup[setup_database.py] --> DB[(retail_store.db<br/>SQLite)]
+    MockData[insert_mock_data.py<br/>120 days synthetic sales] --> DB
+    DB --> Train[train_ai_model.py<br/>per-SKU LinearRegression]
+    Train --> Models[(demand_models.joblib)]
+    Models --> App[app.py · Streamlit]
+    DB --> App
+    App --> Restock[Restock recommendation logic]
+    DB --> RTrends[analyze_trends.R]
+    RTrends --> Plots[Rplots.pdf]
+```
+
+
+
+## What I'd improve with more time
+
+- **Use real transaction data.** The seasonality and trend patterns are synthetic-by-design to validate the modeling approach — the honest next step is swapping in real POS data, which (per the README's own note) requires no changes to training/serving code, only to the data-generation step.
+- **Try a model that captures more than linear trend + day-of-week.** A per-SKU linear regression is simple and interpretable, but something like gradient boosting or a lightweight time-series model (e.g., Prophet or a seasonal ARIMA) would likely close the gap further on high-variance items like bananas, where the baseline is closest.
+- **Add prediction intervals, not just point forecasts.** Restocking decisions are risk decisions — showing a confidence range (not just a single number) would make the reorder-quantity logic more honest about forecast uncertainty.
+- **Retrain on a schedule instead of manually.** Right now models are trained once and loaded; a production version would need scheduled retraining as new sales data accumulates, plus drift monitoring to catch when a SKU's demand pattern shifts.
+
+
